@@ -120,6 +120,7 @@ def train_run(parms):
     TAU = parms["tau"]              # GAE parameter
     # PPO_CLIP_EPSILON = 0.1  # ppo clip parameter
     PPO_CLIP_EPSILON = parms["ppo_clip_epsilon"]  # ppo clip parameter
+    STD = parms["std"]
 
     env = UnityEnvironment(file_name="../../unity_ml_envs/Tennis_Windows_x86_64/Tennis.exe")
     # get the default brain
@@ -141,7 +142,7 @@ def train_run(parms):
                   batch_size=BATCH_SIZE,
                   sgd_epochs=SGD_EPOCHS,
                   gradient_clip=GRADIENT_CLIP,
-                  std=0.1,
+                  std=STD,
                   value_size=1,
                   hidden_size=64,
                   clip_epsilon=PPO_CLIP_EPSILON,
@@ -161,6 +162,7 @@ def train_multiple(params_list):
     lrs = [1e-4, 3e-4]
     weight_decays = [1e-4, 3e-4]
     gae_tau = [0.95, 0.99]
+    stds = [0.0, 0.1, 0.2]
     
     params_list = []
     for sgd_epoch in sgd_epochs:
@@ -170,15 +172,17 @@ def train_multiple(params_list):
                     for lr in lrs:
                         for weight_decay in weight_decays:
                             for tau in gae_tau:
-                                params_list.append({"tau": copy(tau),
-                                                    "sgd_epochs": copy(sgd_epoch),
-                                                    "batch_size": copy(batch_size),
-                                                    "gradient_clip": copy(gradient_clip),
-                                                    "ppo_clip_epsilon": copy(ppo_clip_epsilon),
-                                                    "lr": copy(lr),
-                                                    "weight_decay": copy(weight_decay),
-                                                    "run_name": f"sgd_epochs_{sgd_epoch}_batch_size_{batch_size}_gradient_clip_{gradient_clip}_ppo_clip_epsilon_{ppo_clip_epsilon}_lr_{lr}_weight_decay_{weight_decay}",
-                                                    "save_path": ".."})
+                                for std in stds:
+                                    params_list.append({"std": copy(std), 
+                                                        "tau": copy(tau),
+                                                        "sgd_epochs": copy(sgd_epoch),
+                                                        "batch_size": copy(batch_size),
+                                                        "gradient_clip": copy(gradient_clip),
+                                                        "ppo_clip_epsilon": copy(ppo_clip_epsilon),
+                                                        "lr": copy(lr),
+                                                        "weight_decay": copy(weight_decay),
+                                                        "run_name": f"sgd_epochs_{sgd_epoch}_batch_size_{batch_size}_gradient_clip_{gradient_clip}_ppo_clip_epsilon_{ppo_clip_epsilon}_lr_{lr}_weight_decay_{weight_decay}",
+                                                        "save_path": ".."})
     
     for params in params_list:
         print(f"Starting training with parameters {params['run_name']}")
@@ -230,7 +234,7 @@ if __name__=="__main__":
                   batch_size=BATCH_SIZE,
                   sgd_epochs=SGD_EPOCHS,
                   gradient_clip=GRADIENT_CLIP,
-                  std=0.1,
+                  std=0.0,
                   value_size=1,
                   hidden_size=64,
                   clip_epsilon=PPO_CLIP_EPSILON,
