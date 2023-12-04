@@ -1,20 +1,10 @@
-
-
 # Agent and models
 import torch
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-
-# Agent hyperparameters
-BATCH_SIZE = 32         # minibatch size
-GAMMA = 0.99            # Discount factor
-TAU = 0.95              # GAE parameter
-BETA = 0.01             # entropy regularization parameter
-PPO_CLIP_EPSILON = 0.2  # ppo clip parameter
-GRADIENT_CLIP = 5       # gradient clipping parameter
-
+from PPO import ppo_loss
 
 class Actor(nn.Module):
     def __init__(self, state_size, action_size, hidden_size=64):
@@ -65,15 +55,37 @@ class ActorCritic(nn.Module):
     
 
 class Agent():
-    def __init__(self, num_agents, state_size, action_size):
+    def __init__(self, num_agents, state_size, action_size,
+                 LR=3.e4,
+                 op_epsilon=1.e-5,
+                 weight_decay=1.e-4,
+                 batch_size=32,
+                 sgd_epochs=4,
+                 gradient_clip=5,
+                 std=0.1,
+                 value_size=1,
+                 hidden_size=64,
+                 clip_epsilon=0.1,
+                 c1=0.5,
+                 beta=0.01):
+        
         self.num_agents = num_agents
         self.state_size = state_size
         self.action_size = action_size
-        self.model = ActorCritic(state_size, action_size, value_size=1)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=LR, eps=EPSILON)
+        self.batch_size = batch_size
+        self.gradient_clip = gradient_clip
+        self.lr = LR
+        self.model = ActorCritic(state_size, action_size, value_size=value_size, hidden_size=hidden_size, std=std)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=LR, weight_decay=weight_decay, eps=op_epsilon)
+        
+        self.sgd_epochs = sgd_epochs
+        self.clip_epsilon = clip_epsilon
+        self.c1 = c1
+        self.beta = beta
+        
         self.model.train()
         
-    def act(self, states): # TODO: IS THIS CORRECT? WE SHOULD USE MU AS THE ACTIONS, AND NOT SAMPLE FROM THE DISTRIBUTION ???
+    def act(self, states):
         """Remember: states are state vectors for each agent
         It is used when collecting trajectories
         """
@@ -91,24 +103,24 @@ class Agent():
         using the proximal policy ratio clipped objective function
         """        
 
-        num_batches = states.size(0) // BATCH_SIZE
-        for i in range(sgd_epochs):
+        num_batches = states.size(0) // self.batch_size
+        for i in range(self.sgd_epochs):
             batch_count = 0
             batch_ind = 0
             for i in range(num_batches):
-                sampled_states = states[batch_ind:batch_ind+BATCH_SIZE, :]
-                sampled_actions = actions[batch_ind:batch_ind+BATCH_SIZE, :]
-                sampled_log_probs_old = log_probs_old[batch_ind:batch_ind+BATCH_SIZE, :]
-                sampled_returns = returns[batch_ind:batch_ind+BATCH_SIZE, :]
-                sampled_advantages = advantages[batch_ind:batch_ind+BATCH_SIZE, :]
+                sampled_states = states[batch_ind:batch_ind+self.batch_size, :]
+                sampled_actions = actions[batch_ind:batch_ind+self.batch_size, :]
+                sampled_log_probs_old = log_probs_old[batch_ind:batch_ind+self.batch_size, :]
+                sampled_returns = returns[batch_ind:batch_ind+self.batch_size, :]
+                sampled_advantages = advantages[batch_ind:batch_ind+self.batch_size, :]
                 
-                L = ppo_loss(self.model, sampled_states, sampled_actions, sampled_log_probs_old, sampled_returns, sampled_advantages)
+                L = ppo_loss(self.model, sampled_states, sampled_actions, sampled_log_probs_old, sampled_returns, sampled_advantages,
+                             clip_epsilon=self.clip_epsilon, c1=self.c1, beta=self.beta)
                 
                 self.optimizer.zero_grad()
                 (L).backward()
-                nn.utils.clip_grad_norm_(self.model.parameters(), GRADIENT_CLIP)
+                nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
                 self.optimizer.step()
                 
-                batch_ind += BATCH_SIZE
+                batch_ind += self.batch_size
                 batch_count += 1
-
