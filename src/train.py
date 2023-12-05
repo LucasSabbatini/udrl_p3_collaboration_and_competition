@@ -19,7 +19,9 @@ def collect_trajectories(env, brain_name, agent, max_t):
     agents_rewards = np.zeros(num_agents)
     episode_rewards = []
 
-    for _ in range(max_t):
+    for s in range(max_t):
+    # s = 0
+    # while True:
         actions, log_probs, values = agent.act(states)
         env_info = env.step(actions.cpu().detach().numpy())[brain_name]
         next_states = env_info.vector_observations
@@ -33,8 +35,13 @@ def collect_trajectories(env, brain_name, agent, max_t):
                 agents_rewards[j] = 0
 
         rollout.append([states, values.detach(), actions.detach(), log_probs.detach(), rewards, 1 - dones])
-
+        # s += 1
         states = next_states
+        # if np.any(dones):                                        # exit loop if episode finished
+        #     l_s = s
+        #     break
+        
+    # print(f"Last step: {l_s}.")
 
     pending_value = agent.model(states)[-1]
     returns = pending_value.detach() 
@@ -62,17 +69,7 @@ def train(env, brain_name, agent, num_agents, n_episodes, max_t, gamma=0.99, tau
         test_mean_reward = test_agent(env, agent, brain_name)
 
         all_scores.append(test_mean_reward)
-        all_scores_window.append(test_mean_reward)
-
-        # if np.mean(all_scores_window) > best_so_far:
-        #     if not os.path.isdir(f"{save_path}/ckpt/{run_name}/"):
-        #         os.mkdir(f"{save_path}/ckpt/{run_name}/")
-        #     torch.save(agent.model.state_dict(), f"{save_path}/ckpt/{run_name}/ppo_checkpoint_{np.mean(all_scores_window)}.ckpt")
-        #     best_so_far = np.mean(all_scores_window)
-        #     if np.mean(all_scores_window) > 30:
-                
-        #         print('\nEnvironment solved in {:d} episodes!\tAverage Score: {:.2f}'.format(i_episode, np.mean(all_scores_window)))
-        #         # break       
+        all_scores_window.append(test_mean_reward)      
         
         if (i_episode + 1) % 20 == 0:
             
@@ -92,9 +89,10 @@ def train(env, brain_name, agent, num_agents, n_episodes, max_t, gamma=0.99, tau
     return all_scores
 
 def save_scores(scores, run_name, save_path):
-    if not os.path.isdir(f"{save_path}/{run_name}/"):
-        os.mkdir(f"{save_path}/{run_name}/")
-    np.save(f"{save_path}/{run_name}/scores.npy", scores)
+    print(f"Saving scores to {save_path}/ckpt/{run_name}/scores.npy")
+    if not os.path.isdir(f"{save_path}/ckpt/{run_name}/"):
+        os.mkdir(f"{save_path}/ckpt/{run_name}")
+    np.save(f"{save_path}/ckpt/{run_name}/scores.npy", scores)
 
 
 def train_run(parms):
@@ -103,7 +101,7 @@ def train_run(parms):
     # Training Hyperparameters
     EPISODES = 10000        # Number of episodes to train for
     # MAX_T = 2048          # Max length of trajectory
-    MAX_T = 1000            # Max length of trajectory
+    MAX_T = 500            # Max length of trajectory
     SGD_EPOCHS = parms["sgd_epochs"]          # Number of gradient descent steps per batch of experiences
     BATCH_SIZE = parms["batch_size"]         # minibatch size
     BETA = 0.01             # entropy regularization parameter
@@ -155,6 +153,7 @@ def train_run(parms):
 def train_multiple(params_list):
     """Trains multiple agents with different hyperparameters"""
     
+    max_ts = [100, 250, 500, 1000, 2000]
     sgd_epochs = [3, 4, 5]
     batch_sizes = [32]
     gradient_clips = [1, 3, 5]
@@ -173,16 +172,18 @@ def train_multiple(params_list):
                         for weight_decay in weight_decays:
                             for tau in gae_tau:
                                 for std in stds:
-                                    params_list.append({"std": copy(std), 
-                                                        "tau": copy(tau),
-                                                        "sgd_epochs": copy(sgd_epoch),
-                                                        "batch_size": copy(batch_size),
-                                                        "gradient_clip": copy(gradient_clip),
-                                                        "ppo_clip_epsilon": copy(ppo_clip_epsilon),
-                                                        "lr": copy(lr),
-                                                        "weight_decay": copy(weight_decay),
-                                                        "run_name": f"sgd_epochs_{sgd_epoch}_batch_size_{batch_size}_gradient_clip_{gradient_clip}_ppo_clip_epsilon_{ppo_clip_epsilon}_lr_{lr}_weight_decay_{weight_decay}",
-                                                        "save_path": ".."})
+                                    for max_t in max_ts:
+                                        params_list.append({"max_t": copy(max_t),
+                                                            "std": copy(std), 
+                                                            "tau": copy(tau),
+                                                            "sgd_epochs": copy(sgd_epoch),
+                                                            "batch_size": copy(batch_size),
+                                                            "gradient_clip": copy(gradient_clip),
+                                                            "ppo_clip_epsilon": copy(ppo_clip_epsilon),
+                                                            "lr": copy(lr),
+                                                            "weight_decay": copy(weight_decay),
+                                                            "run_name": f"max_t_{max_t}_sgd_epochs_{sgd_epoch}_batch_size_{batch_size}_gradient_clip_{gradient_clip}_ppo_clip_epsilon_{ppo_clip_epsilon}_lr_{lr}_weight_decay_{weight_decay}",
+                                                            "save_path": ".."})
     
     for params in params_list:
         print(f"Starting training with parameters {params['run_name']}")
@@ -196,11 +197,14 @@ if __name__=="__main__":
     # Training Hyperparameters
     EPISODES = 10000        # Number of episodes to train for
     # MAX_T = 2048          # Max length of trajectory
-    MAX_T = 1000            # Max length of trajectory
+    MAX_T = 500             # Max length of trajectory
     SGD_EPOCHS = 4          # Number of gradient descent steps per batch of experiences
+    # SGD_EPOCHS = 3          # Number of gradient descent steps per batch of experiences
     BATCH_SIZE = 32         # minibatch size
-    BETA = 0.01             # entropy regularization parameter
     GRADIENT_CLIP = 5       # gradient clipping parameter
+    BETA = 0.01             # entropy regularization parameter
+    C1 = 0.5                # value loss coefficient
+    STD = 0.0
 
     # optimizer parameters
     # LR = 5e-4               # learning rate
@@ -234,16 +238,16 @@ if __name__=="__main__":
                   batch_size=BATCH_SIZE,
                   sgd_epochs=SGD_EPOCHS,
                   gradient_clip=GRADIENT_CLIP,
-                  std=0.0,
+                  std=STD,
                   value_size=1,
                   hidden_size=64,
                   clip_epsilon=PPO_CLIP_EPSILON,
-                  c1=0.5,
+                  c1=C1,
                   beta=BETA)
 
     # Train the agent
     print(f"Starting training with parameters LR={LR}, WEIGHT_DECAY={WEIGHT_DECAY}, BATCH_SIZE={BATCH_SIZE}, SGD_EPOCHS={SGD_EPOCHS}, GRADIENT_CLIP={GRADIENT_CLIP}, BETA={BETA}, GAMMA={GAMMA}, TAU={TAU}, PPO_CLIP_EPSILON={PPO_CLIP_EPSILON}")
     # exit()
     train(env, brain_name, agent, num_agents, EPISODES, MAX_T,
-          gamma=GAMMA, tau=TAU, run_name="testing_02", save_path="..")
+          gamma=GAMMA, tau=TAU, run_name="testing_03", save_path="..")
     env.close()
