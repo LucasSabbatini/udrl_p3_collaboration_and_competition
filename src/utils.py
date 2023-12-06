@@ -3,6 +3,7 @@ from pprint import pprint
 import torch
 import os, sys
 import csv
+import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from agent import Agent
@@ -76,3 +77,95 @@ def save_training_scores(row_to_append, filename):
         
         # Write the row to the file
         writer.writerow(row_to_append)
+        
+        
+# CSV file format 
+def save_scores_csv(scores, run_name, save_path):
+    # Ensure the directory exists
+    full_path = f"{save_path}/ckpt/{run_name}"
+    if not os.path.exists(full_path):
+        os.makedirs(full_path)
+    
+    # File path for the CSV file
+    file_path = f"{full_path}/scores.csv"
+
+    # Write scores to a CSV file
+    with open(file_path, 'w', newline='') as csvfile:
+        score_writer = csv.writer(csvfile)
+        score_writer.writerow(['Episode', 'Score'])  # Header
+        for i, score in enumerate(scores, 1):  # Enumerate starts at 1 for episode numbering
+            score_writer.writerow([i, score])
+    
+    print(f"Scores saved to {file_path}")
+
+def load_scores_from_csv(csv_file_path):
+    scores = []
+
+    # Read scores from CSV
+    with open(csv_file_path, 'r') as csvfile:
+        score_reader = csv.reader(csvfile)
+        next(score_reader, None)  # Skip the header
+        for row in score_reader:
+            scores.append(float(row[1]))  # Assuming score is in the second column
+
+    return scores
+
+def read_and_plot_scores_csv(csv_file_path):
+    scores = []
+
+    # Read scores from CSV
+    with open(csv_file_path, 'r') as csvfile:
+        score_reader = csv.reader(csvfile)
+        next(score_reader, None)  # Skip the header
+        for row in score_reader:
+            scores.append(float(row[1]))  # Assuming score is in the second column
+
+    # Plotting
+    plt.plot(scores)
+    plt.title('Scores Over Episodes')
+    plt.xlabel('Episode')
+    plt.ylabel('Score')
+    plt.show()
+    
+
+# NPY file format
+def save_scores_npy(scores, run_name, save_path):
+    print(f"Saving scores to {save_path}/ckpt/{run_name}/scores.npy")
+    if not os.path.isdir(f"{save_path}/ckpt/{run_name}/"):
+        os.mkdir(f"{save_path}/ckpt/{run_name}")
+    np.save(f"{save_path}/ckpt/{run_name}/scores.npy", scores)
+
+def load_scores_npy(run_name, save_path):
+    file_path = f"{save_path}/ckpt/{run_name}/scores.npy"
+
+    if not os.path.isfile(file_path):
+        print(f"No saved scores found at {file_path}")
+        return None
+
+    scores = np.load(file_path)
+    print(f"Scores loaded from {file_path}")
+    return scores
+
+def read_and_plot_scores_npy(run_name, save_path):
+    file_path = f"{save_path}/ckpt/{run_name}/scores.npy"
+
+    if not os.path.isfile(file_path):
+        print(f"No saved scores found at {file_path}")
+        return
+
+    scores = np.load(file_path)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(scores, label='Scores per Episode')
+    plt.title('Training Progress')
+    plt.xlabel('Episodes')
+    plt.ylabel('Scores')
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+    
+    
+    
+
+
