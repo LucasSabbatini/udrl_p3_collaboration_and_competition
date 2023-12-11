@@ -8,7 +8,7 @@ from agent import Agent
 from unityagents import UnityEnvironment
 import numpy as np
 import time
-import copy
+from copy import copy
 
 def collect_trajectories(env, brain_name, agent, max_t):
     env_info = env.reset(train_mode=True)[brain_name]
@@ -47,6 +47,7 @@ def collect_trajectories(env, brain_name, agent, max_t):
     returns = pending_value.detach() 
     rollout.append([states, pending_value, None, None, None, None])
     
+    # return rollout, returns, episode_rewards, np.mean(episode_rewards)
     return rollout, returns, episode_rewards, np.mean(episode_rewards)
 
 
@@ -66,12 +67,12 @@ def train(env, brain_name, agent, num_agents, n_episodes, max_t, gamma=0.99, tau
         # print(f"States: {states.shape}. Actions: {actions.shape}. Log_probs_old: {log_probs_old.shape}. Returns: {returns.shape}. Advantages: {advantages.shape}")
         agent.learn(states, actions, log_probs_old, returns, advantages)
         
-        test_mean_reward = test_agent(env, agent, brain_name)
+        test_max_reward = test_agent(env, agent, brain_name)
 
-        all_scores.append(test_mean_reward)
-        all_scores_window.append(test_mean_reward)      
+        all_scores.append(test_max_reward)
+        all_scores_window.append(test_max_reward)
         
-        if (i_episode + 1) % 50 == 0:
+        if (i_episode + 1) % 20 == 0:
             
             if np.mean(all_scores_window) > best_so_far:
                 
@@ -88,7 +89,7 @@ def train(env, brain_name, agent, num_agents, n_episodes, max_t, gamma=0.99, tau
                 print(f"Early stopping. Best average score so far: {best_so_far}")
                 break
             
-            print('Episode {}, Total score this episode: {}, Last {} average: {}'.format(i_episode + 1, test_mean_reward, min(i_episode + 1, 100), np.mean(all_scores_window)) )
+            print('Episode {}, Total score this episode: {}, Last {} average: {}'.format(i_episode + 1, test_max_reward, min(i_episode + 1, 100), np.mean(all_scores_window)) )
         
     save_scores_npy(all_scores, run_name, save_path)
     save_scores_csv(all_scores, run_name, save_path)
@@ -148,17 +149,19 @@ def train_run(parms):
                   beta=BETA)
     train(env, brain_name, agent, num_agents, EPISODES, MAX_T,
           gamma=GAMMA, tau=TAU, run_name=parms["run_name"], save_path=parms["save_path"])
+    env.close()
 
 
 def train_multiple(params_list):
     """Trains multiple agents with different hyperparameters"""
     
     max_ts = [500, 1000]
-    sgd_epochs = [3, 5]
+    # sgd_epochs = [3, 5]
+    sgd_epochs = [4]
     batch_sizes = [32]
     gradient_clips = [2, 5]
     ppo_clip_epsilons = [0.1, 0.2]
-    lrs = [1e-4, 3e-4]
+    lrs = [3e-4, 1e-3]
     weight_decays = [1e-4]
     gae_tau = [0.95, 0.99]
     stds = [0.0, 0.1]
@@ -189,7 +192,7 @@ def train_multiple(params_list):
                                         run += 1
     
     for params in params_list:
-        print(f"Starting training with parameters {params['run_name']}")
+        # print(f"Starting training with parameters {params['run_name']}")
         train_run(params)
         
 
@@ -205,7 +208,7 @@ if __name__=="__main__":
     
     if train_type == "single":
         parms = {
-            "episodes": 10000,
+            "episodes": 2500,
             "max_t": 500,
             "std": 0.0,
             "tau": 0.95,
@@ -215,70 +218,10 @@ if __name__=="__main__":
             "ppo_clip_epsilon": 0.2,
             "lr": 3e-4,
             "weight_decay": 1e-4,
-            "run_name": f"episodes_{10000}_max_t_{500}_sgd_epochs_{4}_batch_size_{32}_gradient_clip_{5}_ppo_clip_epsilon_{0.2}_lr_{3e-4}_weight_decay_{1e-4}",
+            "run_name": f"episodes_{2500}_max_t_{500}_sgd_epochs_{4}_batch_size_{32}_gradient_clip_{5}_ppo_clip_epsilon_{0.2}_lr_{3e-4}_weight_decay_{1e-4}",
             "save_path": ".."
         }
         train_run(parms)
         
     elif train_type == "search":
         train_multiple([])
-    
-    
-    
-    # # Training Hyperparameters
-    # EPISODES = 10000        # Number of episodes to train for
-    # # MAX_T = 2048          # Max length of trajectory
-    # MAX_T = 500             # Max length of trajectory
-    # SGD_EPOCHS = 4          # Number of gradient descent steps per batch of experiences
-    # # SGD_EPOCHS = 3          # Number of gradient descent steps per batch of experiences
-    # BATCH_SIZE = 32         # minibatch size
-    # GRADIENT_CLIP = 5       # gradient clipping parameter
-    # BETA = 0.01             # entropy regularization parameter
-    # C1 = 0.5                # value loss coefficient
-    # STD = 0.0
-
-    # # optimizer parameters
-    # # LR = 5e-4               # learning rate
-    # LR = 3e-4               # learning rate
-    # OP_EPSILON = 1e-5       # optimizer epsilon
-    # WEIGHT_DECAY = 1.E-4    # L2 weight decay
-
-    # # PPO parameters
-    # GAMMA = 0.99            # Discount factor
-    # TAU = 0.95              # GAE parameter
-    # # PPO_CLIP_EPSILON = 0.1  # ppo clip parameter
-    # PPO_CLIP_EPSILON = 0.2  # ppo clip parameter
-
-    # env = UnityEnvironment(file_name="../../unity_ml_envs/Tennis_Windows_x86_64/Tennis.exe")
-    # # get the default brain
-    # brain_name = env.brain_names[0]
-    # brain = env.brains[brain_name]
-    # env_info = env.reset(train_mode=True)[brain_name]
-    # time.sleep(2)
-
-    # # Environment variables
-    # num_agents = len(env_info.agents)
-    # state_size = env_info.vector_observations.shape[1]
-    # action_size = brain.vector_action_space_size
-    # print(f"Number of agents: {num_agents}. State size: {state_size}. Action size: {action_size}")
-    # # Instantiate the agent
-    # agent = Agent(num_agents, state_size, action_size,
-    #               LR=LR,
-    #               op_epsilon=OP_EPSILON,
-    #               weight_decay=WEIGHT_DECAY,
-    #               batch_size=BATCH_SIZE,
-    #               sgd_epochs=SGD_EPOCHS,
-    #               gradient_clip=GRADIENT_CLIP,
-    #               std=STD,
-    #               value_size=1,
-    #               hidden_size=64,
-    #               clip_epsilon=PPO_CLIP_EPSILON,
-    #               c1=C1,
-    #               beta=BETA)
-
-    # # Train the agent
-    # print(f"Starting training with parameters LR={LR}, WEIGHT_DECAY={WEIGHT_DECAY}, BATCH_SIZE={BATCH_SIZE}, SGD_EPOCHS={SGD_EPOCHS}, GRADIENT_CLIP={GRADIENT_CLIP}, BETA={BETA}, GAMMA={GAMMA}, TAU={TAU}, PPO_CLIP_EPSILON={PPO_CLIP_EPSILON}")
-    # # exit()
-    # train(env, brain_name, agent, num_agents, EPISODES, MAX_T,
-    #       gamma=GAMMA, tau=TAU, run_name="testing_03", save_path="..")
-    # env.close()

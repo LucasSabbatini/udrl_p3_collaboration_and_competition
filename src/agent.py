@@ -76,6 +76,7 @@ class Agent():
         self.gradient_clip = gradient_clip
         self.lr = LR
         self.model = ActorCritic(state_size, action_size, value_size=value_size, hidden_size=hidden_size, std=std)
+        # self.optimizer = optim.Adam(self.model.parameters(), lr=LR, weight_decay=weight_decay, eps=op_epsilon)
         self.optimizer = optim.Adam(self.model.parameters(), lr=LR, weight_decay=weight_decay, eps=op_epsilon)
         
         self.sgd_epochs = sgd_epochs

@@ -4,26 +4,30 @@ import torch
 import os, sys
 import csv
 import matplotlib.pyplot as plt
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from agent import Agent
 
-def test_agent(env, agent, brain_name):
+def test_agent(env, agent, brain_name, num_episodes=1):
     env_info = env.reset(train_mode = True)[brain_name]
     num_agents = len(env_info.agents)
     states = env_info.vector_observations
     scores = np.zeros(num_agents)
-    while True:
-        actions, _, _= agent.act(states)
-        env_info = env.step(actions.cpu().detach().numpy())[brain_name]
-        next_states = env_info.vector_observations
-        rewards = env_info.rewards
-        dones = env_info.local_done
-        scores += env_info.rewards
-        states = next_states
-        if np.any(dones):
-            break
-    return np.mean(scores)
+    for _ in range(num_episodes):
+        while True:
+            actions, _, _= agent.act(states)
+            env_info = env.step(actions.cpu().detach().numpy())[brain_name]
+            next_states = env_info.vector_observations
+            rewards = env_info.rewards
+            dones = env_info.local_done
+            scores += env_info.rewards
+            states = next_states
+            if np.any(dones):
+                break
+            # time.sleep(0.05)
+        # print(f"Score: {np.mean(scores)}")
+    return np.max(scores)
 
 
 def debug(item, name, print_e=False, only_shape=False):
@@ -167,5 +171,38 @@ def read_and_plot_scores_npy(run_name, save_path):
     
     
     
+# import pandas as pd
+# import matplotlib.pyplot as plt
 
+# def plot_rewards_from_csv(file_path):
+#     """
+#     Plots the rewards from a tennis unity training CSV file.
 
+#     Args:
+#     file_path (str): The path to the CSV file containing the training data.
+
+#     The CSV file should have two columns: 'Episode' and 'Score'.
+#     """
+#     try:
+#         # Load the CSV file into a DataFrame
+#         data = pd.read_csv(file_path)
+
+#         # Check if required columns are present
+#         if 'Episode' not in data.columns or 'Score' not in data.columns:
+#             print("CSV file must contain 'Episode' and 'Score' columns.")
+#             return
+
+#         # Plotting the data
+#         plt.figure(figsize=(15, 5))
+#         plt.plot(data['Episode'], data['Score'], label='Score per Episode')
+#         plt.xlabel('Episode')
+#         plt.ylabel('Score')
+#         plt.title('Rewards from Tennis Unity Training')
+#         plt.legend()
+#         plt.grid(True)
+#         plt.show()
+
+#     except FileNotFoundError:
+#         print(f"File not found: {file_path}")
+#     except Exception as e:
+#         print(f"An error occurred: {e}")
